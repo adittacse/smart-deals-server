@@ -31,9 +31,24 @@ async function run() {
         await client.connect();
 
         const db = client.db("smart_DB");
+        const usersCollection = db.collection("users");
         const productsCollection = db.collection("products");
         const bidsCollection = db.collection("bids");
 
+        // users collections api's
+        app.post("/users", async (req, res) => {
+            const newUser = req.body;
+            const email = newUser.email;
+            const query = { email: email };
+            const existingUser = await usersCollection.findOne(query);
+            if (existingUser) {
+                res.send({message: "User already exists."});
+            } else {
+                const result = await usersCollection.insertOne(newUser);
+                res.send(result);
+            }
+        });
+        
         // products collections api's
         app.get("/products", async (req, res) => {
             // const projectFields = { title: 1 };
@@ -44,6 +59,12 @@ async function run() {
                 query.email = email;
             }
             const cursor = productsCollection.find(query);
+            const result = await cursor.toArray();
+            res.send(result);
+        });
+
+        app.get("/latest-products", async (req, res) => {
+            const cursor = productsCollection.find().sort({ created_at: -1 }).limit(6);
             const result = await cursor.toArray();
             res.send(result);
         });

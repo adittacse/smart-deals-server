@@ -130,9 +130,17 @@ async function run() {
 
         app.get("/products/bids/:productId", async (req, res) => {
             const productId = req.params.productId;
+            const product = await productsCollection.findOne({ _id: productId });
             const query = { product: productId };
-            const cursor = bidsCollection.find(query).sort({ bid_price: -1 });
-            const result = await cursor.toArray();
+            const bids = await bidsCollection.find(query).sort({ bid_price: -1 }).toArray();
+            // const result = await cursor.toArray();
+            const result = bids.map(bid => ({
+                ...bid,
+                product_image: product.image,
+                product_title: product.title,
+                product_price_min: product.price_min,
+                product_price_max: product.price_max
+            }));
             res.send(result);
         });
 

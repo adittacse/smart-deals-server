@@ -42,13 +42,13 @@ async function run() {
             const query = { email: email };
             const existingUser = await usersCollection.findOne(query);
             if (existingUser) {
-                res.send({message: "User already exists."});
+                res.send({ message: "User already exists." });
             } else {
                 const result = await usersCollection.insertOne(newUser);
                 res.send(result);
             }
         });
-        
+
         // products collections api's
         app.get("/products", async (req, res) => {
             // const projectFields = { title: 1 };
@@ -64,7 +64,10 @@ async function run() {
         });
 
         app.get("/latest-products", async (req, res) => {
-            const cursor = productsCollection.find().sort({ created_at: -1 }).limit(6);
+            const cursor = productsCollection
+                .find()
+                .sort({ created_at: -1 })
+                .limit(6);
             const result = await cursor.toArray();
             res.send(result);
         });
@@ -72,7 +75,9 @@ async function run() {
         app.get("/products/:id", async (req, res) => {
             const id = req.params.id;
             // const query = { _id: new ObjectId(id) };
-            const query = ObjectId.isValid(id) ? { _id: new ObjectId(id) } : { _id: id };
+            const query = ObjectId.isValid(id)
+                ? { _id: new ObjectId(id) }
+                : { _id: id };
             const result = await productsCollection.findOne(query);
             res.send(result);
         });
@@ -128,18 +133,43 @@ async function run() {
             res.send(result);
         });
 
+        app.get("/my-bids", async (req, res) => {
+            const query = {};
+            if (req.query.email) {
+                query.buyer_email = req.query.email;
+            }
+            const bids = await bidsCollection.find(query).toArray();
+            const result = [];
+            for (const bid of bids) {
+                const product = await productsCollection.findOne({ _id: bid.product });
+                result.push({
+                    ...bid,
+                    product_image: product?.image,
+                    product_title: product?.title,
+                    product_price_min: product?.price_min,
+                    product_price_max: product?.price_max,
+                });
+            }
+            res.send(result);
+        });
+
         app.get("/products/bids/:productId", async (req, res) => {
             const productId = req.params.productId;
-            const product = await productsCollection.findOne({ _id: productId });
+            const product = await productsCollection.findOne({
+                _id: productId,
+            });
             const query = { product: productId };
-            const bids = await bidsCollection.find(query).sort({ bid_price: -1 }).toArray();
+            const bids = await bidsCollection
+                .find(query)
+                .sort({ bid_price: -1 })
+                .toArray();
             // const result = await cursor.toArray();
-            const result = bids.map(bid => ({
+            const result = bids.map((bid) => ({
                 ...bid,
-                product_image: product.image,
-                product_title: product.title,
-                product_price_min: product.price_min,
-                product_price_max: product.price_max
+                product_image: product?.image,
+                product_title: product?.title,
+                product_price_min: product?.price_min,
+                product_price_max: product?.price_max,
             }));
             res.send(result);
         });

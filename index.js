@@ -17,7 +17,7 @@ const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASSWORD}@clu
 const client = new MongoClient(uri, {
     serverApi: {
         version: ServerApiVersion.v1,
-        strict: true,
+        strict: false,
         deprecationErrors: true,
     },
 });
@@ -82,6 +82,16 @@ async function run() {
             res.send(result);
         });
 
+        app.get("/categories", async (req, res) => {
+            const list = await productsCollection.distinct("category");
+            const categories = list
+                .filter(Boolean)
+                .map(s => s.trim())
+                .filter((v, i, a) => a.indexOf(v) === i)
+                .sort((a, b) => a.localeCompare(b));
+            res.send(categories);
+        });
+
         app.post("/products", async (req, res) => {
             const newProduct = req.body;
             const result = await productsCollection.insertOne(newProduct);
@@ -93,10 +103,7 @@ async function run() {
             const updatedProduct = req.body;
             const query = { _id: new ObjectId(id) };
             const update = {
-                $set: {
-                    name: updatedProduct.name,
-                    price: updatedProduct.price,
-                },
+                $set: updatedProduct,
             };
             const options = {};
             const result = await productsCollection.updateOne(

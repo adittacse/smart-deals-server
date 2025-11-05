@@ -3,6 +3,7 @@ const cors = require("cors");
 const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
 const admin = require("firebase-admin");
 const serviceAccount = require("./smart-deals-firebase-admin-key.json");
+const jwt = require('jsonwebtoken');
 const dotenv = require("dotenv");
 dotenv.config();
 
@@ -34,11 +35,33 @@ const verifyFireBaseToken = async (req, res, next) => {
     try {
         const userInfo = await admin.auth().verifyIdToken(token);
         req.token_email = userInfo.email;
-        console.log("after token validation:", userInfo);
+        // console.log("after token validation:", userInfo);
         next();
     } catch {
         return res.status(401).send({ message: "Unauthorized Access" });
     }
+}
+
+const verifyJWTToken = (req, res, next) => {
+    // console.log("in middleware:", req.headers);
+    const authorization = req.headers.authorization;
+    if (!authorization) {
+        return res.status(401).send({ message: "Unauthorized Access" });
+    }
+
+    const token = authorization.split(" ")[1];
+    if (!token) {
+        return res.status(401).send({ message: "Unauthorized Access" });
+    }
+
+    // verify jwt token
+    jwt.verify(token, process.env.JWT_SECRET, (error, decoded) => {
+        if (error) {
+            return res.status(401).send({ message: "Unauthorized Access" });
+        }
+        req.token_email = decoded.email;
+        next();
+    });
 }
 
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASSWORD}@cluster0.gkaujxr.mongodb.net/?appName=Cluster0`;
@@ -64,6 +87,13 @@ async function run() {
         const usersCollection = db.collection("users");
         const productsCollection = db.collection("products");
         const bidsCollection = db.collection("bids");
+
+        // jwt related api
+        app.post("/get-token", (req, res) => {
+            const loggedUser = req.body;
+            const token = jwt.sign(loggedUser, process.env.JWT_SECRET, { expiresIn: "1h" });
+            res.send({token: token});
+        });
 
         // users collections api's
         app.post("/users", async (req, res) => {
@@ -176,17 +206,17 @@ async function run() {
             res.send(result);
         });
 
-        app.get("/my-bids", verifyFireBaseToken, async (req, res) => {
+        // my bids with jwt token verify
+        app.get("/my-bids", verifyJWTToken, async (req, res) => {
             const email = req.query.email;
             const query = {};
-            
             if (email) {
-                if (email !== req.token_email) {
-                    return res.status(403).send({ message: "Forbidden Access" });
-                }
-                query.buyer_email = req.query.email;
+                query.buyer_email = email;
             }
-
+            // verify user email to see data
+            if (email !== req.token_email) {
+                return res.status(403).send({ message: "Forbidden Access" });
+            }
             const bids = await bidsCollection.find(query).toArray();
             const result = [];
             for (const bid of bids) {
@@ -201,6 +231,33 @@ async function run() {
             }
             res.send(result);
         });
+
+        // my bids with firebase token verify
+        // app.get("/my-bids", verifyFireBaseToken, async (req, res) => {
+        //     const email = req.query.email;
+        //     const query = {};
+            
+        //     if (email) {
+        //         if (email !== req.token_email) {
+        //             return res.status(403).send({ message: "Forbidden Access" });
+        //         }
+        //         query.buyer_email = req.query.email;
+        //     }
+
+        //     const bids = await bidsCollection.find(query).toArray();
+        //     const result = [];
+        //     for (const bid of bids) {
+        //         const product = await productsCollection.findOne({ _id: bid.product });
+        //         result.push({
+        //             ...bid,
+        //             product_image: product?.image,
+        //             product_title: product?.title,
+        //             product_price_min: product?.price_min,
+        //             product_price_max: product?.price_max,
+        //         });
+        //     }
+        //     res.send(result);
+        // });
 
         app.get("/products/bids/:productId", verifyFireBaseToken, async (req, res) => {
             const productId = req.params.productId;

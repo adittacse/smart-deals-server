@@ -20,13 +20,13 @@ app.use(express.json());
 app.use(cors());
 
 const verifyFireBaseToken = async (req, res, next) => {
-    if (!req.headers.authorization) {
+    const authorization = req.headers.authorization;
+    if (!authorization) {
         // do not allow to go
         return res.status(401).send({ message: "Unauthorized Access" });
     }
 
-    const token = req.headers.authorization.split(" ")[1];
-    
+    const token = authorization.split(" ")[1];
     if (!token) {
         return res.status(401).send({ message: "Unauthorized Access" });
     }
@@ -152,7 +152,7 @@ async function run() {
             res.send(categories);
         });
 
-        app.post("/products", async (req, res) => {
+        app.post("/products", verifyFireBaseToken, async (req, res) => {
             const newProduct = req.body;
             const result = await productsCollection.insertOne(newProduct);
             res.send(result);
@@ -207,16 +207,17 @@ async function run() {
         });
 
         // my bids with jwt token verify
-        app.get("/my-bids", verifyJWTToken, async (req, res) => {
+        app.get("/my-bids", verifyFireBaseToken, async (req, res) => {
             const email = req.query.email;
             const query = {};
             if (email) {
                 query.buyer_email = email;
+                // verify user email to see data
+                if (email !== req.token_email) {
+                    return res.status(403).send({ message: "Forbidden Access" });
+                }
             }
-            // verify user email to see data
-            if (email !== req.token_email) {
-                return res.status(403).send({ message: "Forbidden Access" });
-            }
+            
             const bids = await bidsCollection.find(query).toArray();
             const result = [];
             for (const bid of bids) {

@@ -11,7 +11,7 @@ const port = process.env.PORT || 3000;
 
 // const decoded = Buffer.from(process.env.FIREBASE_SERVICE_KEY, "base64").toString("utf8");
 // const serviceAccount = JSON.parse(decoded);
-const serviceAccount = require("smart-deals-firebase-admin-key.json");
+const serviceAccount = require("./smart-deals-firebase-admin-key.json");
 
 admin.initializeApp({
     credential: admin.credential.cert(serviceAccount)
